@@ -1,54 +1,69 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.19;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Votes.sol";
+import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/draft-ERC721Votes.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-/// @custom:security-contact julien@strat.cc
+interface ISubscriptionOwner {
+    function getSubscriptionOwner() external view returns (address);
+}
+
 contract Strat is
+    ERC165,
     ERC721,
+    ISubscriptionOwner,
     ERC721Enumerable,
     ERC721URIStorage,
     ERC721Burnable,
     Ownable,
     EIP712,
-    ERC721Votes
+    ERC721Votes,
+    ReentrancyGuard
 {
-    uint256 private _nextTokenId;
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
 
     string public uri;
 
-    constructor(
-        address initialOwner,
-        string _uri
-    ) ERC721("Strat", "STRAT") Ownable(initialOwner) EIP712("Strat", "1") {
+    constructor(string memory _uri) ERC721("StratTest", "STRAT") EIP712("StratTest", "1") {
         uri = _uri;
     }
 
-    function safeMint(address to) public onlyOwner {
-        uint256 tokenId = _nextTokenId++;
-        _safeMint(to, tokenId);
+    function safeMint() public nonReentrant {
+        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter.increment();
+        _safeMint(msg.sender, tokenId);
         _setTokenURI(tokenId, uri);
     }
 
-    function _update(
+    function _beforeTokenTransfer(
+        address from,
         address to,
         uint256 tokenId,
-        address auth
-    ) internal override(ERC721, ERC721Enumerable, ERC721Votes) returns (address) {
-        return super._update(to, tokenId, auth);
+        uint256 batchSize
+    ) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 
-    function _increaseBalance(
-        address account,
-        uint128 value
-    ) internal override(ERC721, ERC721Enumerable, ERC721Votes) {
-        super._increaseBalance(account, value);
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override(ERC721, ERC721Votes) {
+        super._afterTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
     }
 
     function tokenURI(
@@ -59,7 +74,13 @@ contract Strat is
 
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(ERC721, ERC721Enumerable, ERC721URIStorage) returns (bool) {
-        return super.supportsInterface(interfaceId);
+    ) public view override(ERC721, ERC721Enumerable, ERC721URIStorage, ERC165) returns (bool) {
+        return
+            interfaceId == type(ISubscriptionOwner).interfaceId ||
+            super.supportsInterface(interfaceId);
+    }
+
+    function getSubscriptionOwner() external view returns (address) {
+        return owner();
     }
 }

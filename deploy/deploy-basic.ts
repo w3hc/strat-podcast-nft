@@ -1,7 +1,7 @@
 import "@nomiclabs/hardhat-ethers"
 
 //your address here...
-const initialMint = ethers.parseEther("10000")
+const uri = "yo"
 
 //to deploy, run yarn hardhat deploy --network hardhat
 
@@ -11,10 +11,10 @@ export default async ({ getNamedAccounts, deployments }) => {
     const { deployer } = await getNamedAccounts()
     console.log(deployer)
 
-    await deploy("Basic", {
+    await deploy("Strat", {
         from: deployer,
-        args: [initialMint],
+        args: [uri],
         log: true
     })
 }
-export const tags = ["Basic"]
+export const tags = ["Strat"]
